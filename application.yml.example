@@ -1,0 +1,165 @@
+# Arbitrix Configuration Example
+# Copy this file to application.yml and fill in your values
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: arbitrix
+
+# ===========================================
+# Exchange API Configuration
+# ===========================================
+
+# OKX Configuration
+okx:
+  api:
+    key: ${OKX_API_KEY:your-api-key}
+    secret: ${OKX_API_SECRET:your-api-secret}
+    passphrase: ${OKX_PASSPHRASE:your-passphrase}
+  websocket:
+    public-url: wss://ws.okx.com:8443/ws/v5/public
+    private-url: wss://ws.okx.com:8443/ws/v5/private
+  rest:
+    base-url: https://www.okx.com
+
+# Bybit Configuration
+bybit:
+  api:
+    key: ${BYBIT_API_KEY:your-api-key}
+    secret: ${BYBIT_API_SECRET:your-api-secret}
+  websocket:
+    public-url: wss://stream.bybit.com/v5/public/spot
+    private-url: wss://stream.bybit.com/v5/private
+  rest:
+    base-url: https://api.bybit.com
+
+# Bitget Configuration
+bitget:
+  api:
+    key: ${BITGET_API_KEY:your-api-key}
+    secret: ${BITGET_API_SECRET:your-api-secret}
+    passphrase: ${BITGET_PASSPHRASE:your-passphrase}
+  websocket:
+    public-url: wss://ws.bitget.com/spot/v1/stream
+    private-url: wss://ws.bitget.com/spot/v1/stream
+  rest:
+    base-url: https://api.bitget.com
+
+# Binance Configuration
+binance:
+  api:
+    key: ${BINANCE_API_KEY:your-api-key}
+    secret: ${BINANCE_API_SECRET:your-api-secret}
+  websocket:
+    base-url: wss://stream.binance.com:9443
+  rest:
+    base-url: https://api.binance.com
+
+# ===========================================
+# Trading Configuration
+# ===========================================
+
+trading:
+  # Trading symbols (comma-separated)
+  symbols: BTC-USDT,ETH-USDT
+
+  # Default exchange: okx, bybit, bitget, binance
+  default-exchange: okx
+
+# ===========================================
+# Strategy Configuration
+# ===========================================
+
+strategy:
+  # Strategy type: pure_market_making, profit_market_making, avellaneda_stoikov, grid
+  type: pure_market_making
+
+  # Pure Market Making Settings
+  pure-market-making:
+    # Spread percentage (0.001 = 0.1%)
+    spread: 0.001
+    # Order amount in base currency
+    order-amount: 0.01
+    # Number of order levels
+    levels: 3
+    # Level spread multiplier
+    level-spread: 0.0005
+
+  # Avellaneda-Stoikov Settings
+  avellaneda-stoikov:
+    # Risk aversion parameter (gamma)
+    gamma: 0.1
+    # Order intensity parameter (kappa)
+    kappa: 1.5
+    # Time horizon in seconds
+    time-horizon: 300
+
+  # Grid Trading Settings
+  grid:
+    # Upper price bound
+    upper-price: 50000
+    # Lower price bound
+    lower-price: 40000
+    # Number of grid levels
+    grid-levels: 10
+    # Amount per grid
+    amount-per-grid: 0.001
+
+# ===========================================
+# Risk Management
+# ===========================================
+
+risk:
+  # Maximum position size in base currency
+  max-position: 1.0
+  # Maximum daily loss in quote currency
+  max-daily-loss: 100
+  # Stop loss percentage
+  stop-loss: 0.05
+  # Enable kill switch
+  kill-switch-enabled: true
+
+# ===========================================
+# Performance Tuning
+# ===========================================
+
+performance:
+  # Enable CPU affinity binding (Linux only)
+  cpu-affinity-enabled: false
+  # Core IDs for affinity binding
+  cpu-cores: 0,1,2,3
+  # Thread pool size for order execution
+  executor-pool-size: 4
+  # WebSocket reconnect interval (ms)
+  ws-reconnect-interval: 5000
+
+# ===========================================
+# Monitoring & Metrics
+# ===========================================
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: arbitrix
+
+# ===========================================
+# Logging
+# ===========================================
+
+logging:
+  level:
+    root: INFO
+    io.arbitrix: DEBUG
+  file:
+    name: logs/arbitrix.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

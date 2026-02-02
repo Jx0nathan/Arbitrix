@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="INFO">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout
+                    pattern="[%-p] [%d{yyyy.MM.dd HH:mm:ss.SSS}] [${sys:local-ip}] [%X{traceId}] [%t] [%c(%L)] - %m%n"
+            />
+        </Console>
+        <CatAppender name="CatAppender"/>
+    </Appenders>
+    <Loggers>
+        <Root level="INFO">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="CatAppender" />
+        </Root>
+    </Loggers>
+</Configuration>

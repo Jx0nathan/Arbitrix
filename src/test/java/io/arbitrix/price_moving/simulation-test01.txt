@@ -1,0 +1,102 @@
+系统启动的市场价: 59965.43 
+
+{"price":"59965.47","side":"SELL","time":1711286490134,"orderLevel":4}
+{"price":"59965.46","side":"SELL","time":1711286490133,"orderLevel":3}
+{"price":"59965.45","side":"SELL","time":1711286490133,"orderLevel":2}
+{"price":"59965.44","side":"SELL","time":1711286490133,"orderLevel":1}
+
+{"price":"59965.42","side":"BUY","time":1711286490132,"orderLevel":1}
+{"price":"59965.41","side":"BUY","time":1711286490133,"orderLevel":2}
+{"price":"59965.40","side":"BUY","time":1711286490133,"orderLevel":3}
+{"price":"59965.39","side":"BUY","time":1711286490133,"orderLevel":4}
+
+(1) 买单 59965.42 成交；订单薄下移1位；基准订单薄正确
+
+ {"price":"59965.46","side":"SELL","time":1711286490133,"orderLevel":4}
+ {"price":"59965.45","side":"SELL","time":1711286490133,"orderLevel":3}
+ {"price":"59965.44","side":"SELL","time":1711286490133,"orderLevel":2}
+ {"price":"59965.43","side":"SELL","time":1711286512444,"orderLevel":1}
+
+ {"price":"59965.41","side":"BUY","time":1711286490133,"orderLevel":1}
+ {"price":"59965.40","side":"BUY","time":1711286490133,"orderLevel":2}
+ {"price":"59965.39","side":"BUY","time":1711286490133,"orderLevel":3}
+ {"price":"59965.38","side":"BUY","time":1711286512444,"orderLevel":4}
+
+
+(2) 买单 59965.41 成交；订单薄下移1位；基准订单薄正确
+
+  {"price":"59965.45","side":"SELL","time":1711286490133,"orderLevel":4}
+  {"price":"59965.44","side":"SELL","time":1711286490133,"orderLevel":3}
+  {"price":"59965.43","side":"SELL","time":1711286512444,"orderLevel":2} 
+  {"price":"59965.42","side":"SELL","time":1711286512462,"orderLevel":1}
+
+  {"price":"59965.40","side":"BUY","time":1711286490133,"orderLevel":1}
+  {"price":"59965.39","side":"BUY","time":1711286490133,"orderLevel":2}
+  {"price":"59965.38","side":"BUY","time":1711286512444,"orderLevel":3}
+  {"price":"59965.37","side":"BUY","time":1711286512462,"orderLevel":4}
+
+
+(3) 买单 59965.40 成交；订单薄下移1位；基准订单薄正确  
+
+   {"price":"59965.44","side":"SELL","time":1711286490133,"orderLevel":4}
+   {"price":"59965.43","side":"SELL","time":1711286512444,"orderLevel":3}
+   {"price":"59965.42","side":"SELL","time":1711286512462,"orderLevel":2}
+   {"price":"59965.41","side":"SELL","time":1711286512467,"orderLevel":1}
+
+   {"price":"59965.39","side":"BUY","time":1711286490133,"orderLevel":1}
+   {"price":"59965.38","side":"BUY","time":1711286512444,"orderLevel":2}
+   {"price":"59965.37","side":"BUY","time":1711286512462,"orderLevel":3}
+   {"price":"59965.36","side":"BUY","time":1711286512467,"orderLevel":4}
+
+
+(4) 买单 59965.39 成交；订单薄下移1位；基准订单薄正确     
+
+    {"price":"59965.43","side":"SELL","time":1711286512444,"orderLevel":4}
+    {"price":"59965.42","side":"SELL","time":1711286512462,"orderLevel":3}
+    {"price":"59965.41","side":"SELL","time":1711286512467,"orderLevel":2}
+    {"price":"59965.40","side":"SELL","time":1711286512468,"orderLevel":1}
+
+    {"price":"59965.38","side":"BUY","time":1711286512444,"orderLevel":1}
+    {"price":"59965.37","side":"BUY","time":1711286512462,"orderLevel":2}
+    {"price":"59965.36","side":"BUY","time":1711286512467,"orderLevel":3}
+    {"price":"59965.35","side":"BUY","time":1711286512468,"orderLevel":4}
+
+    
+(5) 卖单 59965.43 成交，击穿订单薄，基准订单薄正确 （信息流到达的时间：2024.03.24 21:21:54.302）
+    
+    {"price":"60000.04","side":"SELL","time":1711286514301,"orderLevel":4}
+    {"price":"60000.03","side":"SELL","time":1711286514301,"orderLevel":3}
+    {"price":"60000.02","side":"SELL","time":1711286514301,"orderLevel":2}
+    {"price":"60000.01","side":"SELL","time":1711286514301,"orderLevel":1}
+
+    {"price":"59999.99","side":"BUY","time":1711286514301,"orderLevel":1}
+    {"price":"59999.98","side":"BUY","time":1711286514301,"orderLevel":2}
+    {"price":"59999.97","side":"BUY","time":1711286514301,"orderLevel":3}
+    {"price":"59999.96","side":"BUY","time":1711286514301,"orderLevel":4}
+
+
+(6) 卖单 59965.40 成交；没有在订单薄中找到对应的订单，认为当前缓存有问题，重新计算；基准订单薄正确 （信息流到达的时间：2024.03.24 21:21:55.554）
+    结论：如果消息乱序了，会重新基于市场价重构订单薄，因此这个问题不是很大
+
+    {"price":"60000.04","side":"SELL","time":1711286515632,"orderLevel":4}
+    {"price":"60000.03","side":"SELL","time":1711286515632,"orderLevel":3}
+    {"price":"60000.02","side":"SELL","time":1711286515632,"orderLevel":2}
+    {"price":"60000.01","side":"SELL","time":1711286515632,"orderLevel":1}
+
+    {"price":"59999.99","side":"BUY","time":1711286515632,"orderLevel":1}
+    {"price":"59999.98","side":"BUY","time":1711286515632,"orderLevel":2}
+    {"price":"59999.97","side":"BUY","time":1711286515632,"orderLevel":3}
+    {"price":"59999.96","side":"BUY","time":1711286515632,"orderLevel":4}
+
+(7) 买单 59999.99 成交；订单薄下移1位；基准订单薄正确 
+
+    {"price":"60000.03","side":"SELL","time":1711286515632,"orderLevel":4}
+    {"price":"60000.02","side":"SELL","time":1711286515632,"orderLevel":3}
+    {"price":"60000.01","side":"SELL","time":1711286515632,"orderLevel":2}
+    {"price":"60000.00","side":"SELL","time":1711286517988,"orderLevel":1}
+    
+    {"price":"59999.98","side":"BUY","time":1711286515632,"orderLevel":1}
+    {"price":"59999.97","side":"BUY","time":1711286515632,"orderLevel":2}
+    {"price":"59999.96","side":"BUY","time":1711286515632,"orderLevel":3}
+    {"price":"59999.95","side":"BUY","time":1711286517988,"orderLevel":4}
+    
