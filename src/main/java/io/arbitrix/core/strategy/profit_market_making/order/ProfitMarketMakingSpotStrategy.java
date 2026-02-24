@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import javax.annotation.PostConstruct;
 import io.arbitrix.core.common.domain.ExchangeOrder;
 import io.arbitrix.core.common.domain.ReadyExecuteContext;
 import io.arbitrix.core.common.domain.SpotOrderExecutionContext;
@@ -26,6 +27,8 @@ import io.arbitrix.core.strategy.base.condition.ExecuteStrategyConditional;
 import io.arbitrix.core.strategy.base.enums.ProfitOrderPlaceStrategyEnum;
 import io.arbitrix.core.strategy.profit_market_making.data.ProfitMarketMakingSpotOrderTradeDataManager;
 import io.arbitrix.core.strategy.profit_market_making.data.SymbolDataHolder;
+import io.arbitrix.core.strategy.profit_market_making.inventory.DynamicSpreadCalculator;
+import io.arbitrix.core.strategy.profit_market_making.inventory.InventoryTracker;
 import io.arbitrix.core.utils.OrderTradeUtil;
 import io.arbitrix.core.utils.SystemClock;
 import io.arbitrix.core.common.util.JacksonUtil;
@@ -56,13 +59,29 @@ public class ProfitMarketMakingSpotStrategy extends AbstractExchangeClient imple
     @Value("${market.making.price.spread:}")
     private String symbolInterval;
 
+    /** 总资本（USDT），用于计算库存偏斜，默认 10000。配置项：market.making.total-capital */
+    @Value("${market.making.total-capital:10000}")
+    private BigDecimal totalCapital;
+
+    // 配置缓存，启动时解析一次，避免每次 tick 重复反序列化
+    private Map<String, String> symbolQuantityCache;
+    private Map<String, BigDecimal> symbolIntervalCache;
+
     private final ProfitMarketMakingSpotOrderTradeDataManager profitOrderTradeDataManager;
     private final OrderBookDepthDistribution orderBookDepthDistribution;
     private final ProfitOrderPlaceStrategy profitOrderPlaceStrategy;
     private final SymbolDataHolder symbolDataHolder;
+    private final InventoryTracker inventoryTracker;
+    private final DynamicSpreadCalculator dynamicSpreadCalculator;
 
     private final BigDecimal orderLevelSpread = new BigDecimal(EnvUtil.getProperty("order_level_spread_cmd", "0.00003"));
     private final BigDecimal profitAskPriceBaseOnBestBidPrice = new BigDecimal(EnvUtil.getProperty("profit_ask_price_base_on_best_bid_price_cmd", "0.00002"));
+
+    @PostConstruct
+    public void initConfigCache() {
+        this.symbolQuantityCache = JacksonUtil.fromMap(symbolQuantity, String.class);
+        this.symbolIntervalCache = JacksonUtil.fromMap(symbolInterval, BigDecimal.class);
+    }
 
     public ProfitMarketMakingSpotStrategy(ProfitMarketMakingSpotOrderTradeDataManager profitOrderTradeDataManager,
                                           ProfitOrderPlaceStrategy profitOrderPlaceStrategy,
@@ -72,12 +91,16 @@ public class ProfitMarketMakingSpotStrategy extends AbstractExchangeClient imple
                                           OkxPlaceOrderClient okxPlaceOrderClient,
                                           OrderBookDepthDistribution orderBookDepthDistribution,
                                           SymbolDataHolder symbolDataHolder,
-                                          MarketFacade marketFacade) {
+                                          MarketFacade marketFacade,
+                                          InventoryTracker inventoryTracker,
+                                          DynamicSpreadCalculator dynamicSpreadCalculator) {
         super(marketFacade, binanceWsApiClient, bitgetRestClient, bybitRestClient, okxPlaceOrderClient, okxCancelOrderClient);
         this.profitOrderTradeDataManager = profitOrderTradeDataManager;
         this.orderBookDepthDistribution = orderBookDepthDistribution;
         this.profitOrderPlaceStrategy = profitOrderPlaceStrategy;
         this.symbolDataHolder = symbolDataHolder;
+        this.inventoryTracker = inventoryTracker;
+        this.dynamicSpreadCalculator = dynamicSpreadCalculator;
     }
 
     @Override
@@ -171,48 +194,65 @@ public class ProfitMarketMakingSpotStrategy extends AbstractExchangeClient imple
     }
 
     /**
-     * 买价 = 价格 * (1 - 订单层级 * order_level_spread） <br>
-     * 卖价 = 价格 * (1 + 订单层级 * order_level_spread） <br>
+     * 买价 = 价格 * (1 - 订单层级 * effectiveBuySpread） <br>
+     * 卖价 = 价格 * (1 + 订单层级 * effectiveSellSpread） <br>
+     *
+     * <p>effectiveSpread = baseSpread * volatilityMultiplier * inventoryFactor <br>
+     * - volatilityMultiplier：波动率高时放宽价差，最大2倍 <br>
+     * - inventoryFactor：持仓偏多时卖单收窄/买单放宽，持仓偏少时反之 <br>
      */
     public List<ExchangeOrder> createSportOrder(SpotOrderExecutionContext context) {
         List<ExchangeOrder> sportOrderList = new ArrayList<>();
-        Map<String, String> symbolIntervalMap = JacksonUtil.fromMap(symbolQuantity, String.class);
+        String symbol = context.getSymbol();
+
+        BigDecimal midPrice = context.isBuy()
+                ? new BigDecimal(context.getBookTickerEvent().getBidPrice())
+                : new BigDecimal(context.getBookTickerEvent().getAskPrice());
+
+        // 更新波动率状态（每次 tick 传入最新 mid price）
+        dynamicSpreadCalculator.updatePrice(symbol, midPrice);
+
+        // 波动率倍数：1.0 ~ 2.0
+        BigDecimal volatilityMultiplier = dynamicSpreadCalculator.getVolatilityMultiplier(symbol);
+
+        // 库存偏斜因子：[buyFactor, sellFactor]，偏多时 buyFactor > 1 且 sellFactor < 1
+        BigDecimal[] spreadFactors = inventoryTracker.getSpreadFactors(symbol, midPrice, totalCapital);
+        BigDecimal buySpreadFactor = spreadFactors[0];
+        BigDecimal sellSpreadFactor = spreadFactors[1];
+
+        // 最终有效价差
+        BigDecimal effectiveBuySpread = orderLevelSpread.multiply(volatilityMultiplier).multiply(buySpreadFactor);
+        BigDecimal effectiveSellSpread = orderLevelSpread.multiply(volatilityMultiplier).multiply(sellSpreadFactor);
+
+        log.debug("createSportOrder: symbol={}, volMultiplier={}, buyFactor={}, sellFactor={}, effectiveBuySpread={}, effectiveSellSpread={}",
+                symbol, volatilityMultiplier, buySpreadFactor, sellSpreadFactor, effectiveBuySpread, effectiveSellSpread);
 
         int orderSize = profitOrderPlaceStrategy.getOrderPlaceQuantity();
         if (context.getOrderSide() == OrderSide.BUY) {
-            String buyKey = OrderTradeUtil.buildOrderTradeKey(context.getExchangeName(), context.getSymbol(), OrderSide.BUY);
-            String configBuyOrderValue = symbolIntervalMap.getOrDefault(buyKey, "0.1");
+            String buyKey = OrderTradeUtil.buildOrderTradeKey(context.getExchangeName(), symbol, OrderSide.BUY);
+            String configBuyOrderValue = symbolQuantityCache.getOrDefault(buyKey, "0.1");
 
             BigDecimal bestBidPrice = new BigDecimal(context.getBookTickerEvent().getBidPrice());
             for (int i = 1; i <= orderSize; i++) {
-
-                // TODO 这个规则我先写死，可以要针对交易所的规则做特定的处理 ETHUSDT.tickSize = 0.01  BTCUSDT.tickSize = 0.1
-                // https://api.bybit.com/derivatives/v3/public/instruments-info?category=linear&symbol=BTCUSDT
-                BigDecimal price = bestBidPrice.multiply(BASE_PERCENT.subtract(BigDecimal.valueOf(i).multiply(orderLevelSpread)));
+                BigDecimal price = bestBidPrice.multiply(BASE_PERCENT.subtract(BigDecimal.valueOf(i).multiply(effectiveBuySpread)));
                 BigDecimal roundedNumber = price.setScale(2, RoundingMode.DOWN);
-
                 String uuid = orderBookDepthDistribution.getUuidByOrderLevel(context.getOrderLevel());
-                String buyOrderQuantity = this.calculateQuantity(context.getExchangeName(), context.getSymbol(), Category.SPOT.getCode(), roundedNumber, configBuyOrderValue);
-                ExchangeOrder sportOrder = ExchangeOrder.limitMarketBuy(context.getSymbol(), buyOrderQuantity, roundedNumber.toString(), uuid);
-                sportOrderList.add(sportOrder);
+                String buyOrderQuantity = this.calculateQuantity(context.getExchangeName(), symbol, Category.SPOT.getCode(), roundedNumber, configBuyOrderValue);
+                sportOrderList.add(ExchangeOrder.limitMarketBuy(symbol, buyOrderQuantity, roundedNumber.toString(), uuid));
             }
         }
 
         if (context.getOrderSide() == OrderSide.SELL) {
-            String sellKey = OrderTradeUtil.buildOrderTradeKey(context.getExchangeName(), context.getSymbol(), OrderSide.SELL);
-            String configSellOrderValue = symbolIntervalMap.getOrDefault(sellKey, "0.1");
-
+            String sellKey = OrderTradeUtil.buildOrderTradeKey(context.getExchangeName(), symbol, OrderSide.SELL);
+            String configSellOrderValue = symbolQuantityCache.getOrDefault(sellKey, "0.1");
 
             BigDecimal bestAskPrice = new BigDecimal(context.getBookTickerEvent().getAskPrice());
             for (int i = 1; i <= orderSize; i++) {
-                // TODO 这个规则我先写死，可以要针对交易所的规则做特定的处理 ETHUSDT.tickSize = 0.01  BTCUSDT.tickSize = 0.1
-                BigDecimal price = bestAskPrice.multiply(BASE_PERCENT.add(BigDecimal.valueOf(i).multiply(orderLevelSpread)));
+                BigDecimal price = bestAskPrice.multiply(BASE_PERCENT.add(BigDecimal.valueOf(i).multiply(effectiveSellSpread)));
                 BigDecimal roundedNumber = price.setScale(2, RoundingMode.DOWN);
-
                 String uuid = orderBookDepthDistribution.getUuidByOrderLevel(context.getOrderLevel());
-                String sellOrderQuantity = this.calculateQuantity(context.getExchangeName(), context.getSymbol(), Category.SPOT.getCode(), roundedNumber, configSellOrderValue);
-                ExchangeOrder sportOrder = ExchangeOrder.limitMarketSell(context.getSymbol(), sellOrderQuantity, roundedNumber.toString(), uuid);
-                sportOrderList.add(sportOrder);
+                String sellOrderQuantity = this.calculateQuantity(context.getExchangeName(), symbol, Category.SPOT.getCode(), roundedNumber, configSellOrderValue);
+                sportOrderList.add(ExchangeOrder.limitMarketSell(symbol, sellOrderQuantity, roundedNumber.toString(), uuid));
             }
         }
         return sportOrderList;

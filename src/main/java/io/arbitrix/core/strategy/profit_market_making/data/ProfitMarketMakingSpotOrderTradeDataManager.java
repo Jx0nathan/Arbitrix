@@ -18,6 +18,7 @@ import io.arbitrix.core.strategy.base.action.AbstractOrderTradeDataManager;
 import io.arbitrix.core.strategy.base.action.OrderTradeUpdateListener;
 import io.arbitrix.core.strategy.base.condition.ExecuteStrategyConditional;
 import io.arbitrix.core.strategy.base.openorder.*;
+import io.arbitrix.core.strategy.profit_market_making.inventory.InventoryTracker;
 import io.arbitrix.core.strategy.profit_market_making.order.OrderBookDepthDistribution;
 import io.arbitrix.core.strategy.profit_market_making.order.ProfitOrderPlaceStrategy;
 import io.arbitrix.core.utils.ExchangeMarketOpenUtilV2;
@@ -46,6 +47,7 @@ public class ProfitMarketMakingSpotOrderTradeDataManager extends AbstractOrderTr
     private final ExchangeNameEnum exchangeNameEnum;
     private final OrderBookDepthDistribution orderBookDepthDistribution;
     private final ProfitOrderPlaceStrategy profitOrderPlaceStrategy;
+    private final InventoryTracker inventoryTracker;
 
     public ProfitMarketMakingSpotOrderTradeDataManager(BinanceOpenOrderRunner binanceOpenOrderRunner,
                                                        OkxOpenOrderRunner okxOpenOrderRunner,
@@ -53,11 +55,13 @@ public class ProfitMarketMakingSpotOrderTradeDataManager extends AbstractOrderTr
                                                        BybitOpenOrderRunner bybitOpenOrderRunner,
                                                        ExchangeMarketOpenUtilV2 exchangeMarketOpenUtil,
                                                        OrderBookDepthDistribution orderBookDepthDistribution,
-                                                       ProfitOrderPlaceStrategy profitOrderPlaceStrategy) {
+                                                       ProfitOrderPlaceStrategy profitOrderPlaceStrategy,
+                                                       InventoryTracker inventoryTracker) {
         super(exchangeMarketOpenUtil, binanceOpenOrderRunner, okxOpenOrderRunner, bitgetOpenOrderRunner, bybitOpenOrderRunner);
         this.exchangeMarketOpenUtil = exchangeMarketOpenUtil;
         this.orderBookDepthDistribution = orderBookDepthDistribution;
         this.exchangeNameEnum = ExchangeNameEnum.getExchangeName(EnvUtil.getProperty(EXCHANGE));
+        this.inventoryTracker = inventoryTracker;
         this.profitOrderPlaceStrategy = profitOrderPlaceStrategy;
     }
 
@@ -155,6 +159,19 @@ public class ProfitMarketMakingSpotOrderTradeDataManager extends AbstractOrderTr
         int orderLevel = orderBookDepthDistribution.getOrderLevelByUUid(event.getOrigClientOrderId());
         String cacheKey = OrderTradeUtil.buildLevelOrderTradeKey(exchangeName, event.getSymbol(), event.getSide(), orderLevel);
         log.info("ProfitMarketMakingSpotOrderTradeDataManager.orderTradeUpdateEvent: cacheKey is {} time {} event is {} ", cacheKey, System.currentTimeMillis(), event.toString());
+
+        // 成交事件 → 更新库存跟踪器
+        if (event.getExecutionType() == ExecutionType.TRADE
+                && event.getQuantityLastFilledTrade() != null) {
+            try {
+                inventoryTracker.onOrderFilled(
+                        event.getSymbol(),
+                        event.getSide(),
+                        new BigDecimal(event.getQuantityLastFilledTrade()));
+            } catch (Exception e) {
+                log.warn("InventoryTracker.onOrderFilled failed, symbol={}", event.getSymbol(), e);
+            }
+        }
 
         if (event.getExecutionType() == ExecutionType.TRADE || event.getExecutionType() == ExecutionType.CANCELED) {
             OwnOrderBook cacheOwnerOrder = orderTradePool.get(cacheKey);
