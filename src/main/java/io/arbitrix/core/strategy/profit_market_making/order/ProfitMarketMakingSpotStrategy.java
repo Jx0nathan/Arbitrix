@@ -242,7 +242,7 @@ public class ProfitMarketMakingSpotStrategy extends AbstractExchangeClient imple
                     Category.SPOT.getCode(), new BigDecimal(context.getBookTickerEvent().getAskPrice()),
                     symbolIntervalMap.getOrDefault(sellKey, "0.1"));
             BookTickerEvent bookTickerEvent = context.getBookTickerEvent();
-            ExchangeOrder sportOrder = ExchangeOrder.limitMarketBuy(context.getSymbol(), sellOrderQuantity, bookTickerEvent.getAskPrice(), uuid);
+            ExchangeOrder sportOrder = ExchangeOrder.limitMarketSell(context.getSymbol(), sellOrderQuantity, bookTickerEvent.getAskPrice(), uuid);
             sportOrderList.add(sportOrder);
         }
         return sportOrderList;
