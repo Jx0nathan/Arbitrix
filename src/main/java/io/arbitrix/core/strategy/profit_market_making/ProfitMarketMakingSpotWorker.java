@@ -14,8 +14,11 @@ import io.arbitrix.core.common.orderbook.OwnOrderBook;
 import io.arbitrix.core.strategy.base.action.OrderBookDepthEventListener;
 import io.arbitrix.core.strategy.base.condition.ExecuteStrategyConditional;
 import io.arbitrix.core.strategy.profit_market_making.data.ProfitMarketMakingSpotOrderTradeDataManager;
+import io.arbitrix.core.strategy.profit_market_making.filter.TrendFilter;
 import io.arbitrix.core.strategy.profit_market_making.order.ProfitMarketMakingSpotStrategy;
 import io.arbitrix.core.strategy.profit_market_making.order.ProfitOrderPlaceStrategy;
+
+import java.math.BigDecimal;
 import io.arbitrix.core.utils.ExchangeMarketOpenUtilV2;
 import io.arbitrix.core.utils.SystemClock;
 import io.arbitrix.core.utils.executor.MarkerMakerExecutor;
@@ -41,17 +44,21 @@ public class ProfitMarketMakingSpotWorker implements OrderBookDepthEventListener
     private final ProfitMarketMakingSpotOrderTradeDataManager profitOrderTradeDataManager;
     private final ProfitMarketMakingSpotStrategy fixedSpreadBasedOrderPlace;
     private final ProfitOrderPlaceStrategy profitOrderPlaceStrategy;
+    private final TrendFilter trendFilter;
     private final String sideType;
 
     private final ThreadPoolExecutor PLACE_BUY_ORDER_EXECUTOR = PlaceBuyOrderExecutor.getInstance();
     private final ThreadPoolExecutor PLACE_SELL_ORDER_EXECUTOR = PlaceSellOrderExecutor.getInstance();
     private final ThreadPoolExecutor MARKER_MAKER_EXECUTOR = MarkerMakerExecutor.getInstance();
 
-
-    public ProfitMarketMakingSpotWorker(ProfitMarketMakingSpotOrderTradeDataManager profitOrderTradeDataManager, ProfitMarketMakingSpotStrategy fixedSpreadBasedOrderPlace, ProfitOrderPlaceStrategy profitOrderPlaceStrategy) {
+    public ProfitMarketMakingSpotWorker(ProfitMarketMakingSpotOrderTradeDataManager profitOrderTradeDataManager,
+                                        ProfitMarketMakingSpotStrategy fixedSpreadBasedOrderPlace,
+                                        ProfitOrderPlaceStrategy profitOrderPlaceStrategy,
+                                        TrendFilter trendFilter) {
         this.profitOrderTradeDataManager = profitOrderTradeDataManager;
         this.fixedSpreadBasedOrderPlace = fixedSpreadBasedOrderPlace;
         this.profitOrderPlaceStrategy = profitOrderPlaceStrategy;
+        this.trendFilter = trendFilter;
         sideType = EnvUtil.getProperty(SIDE_TYPE);
     }
 
@@ -73,8 +80,21 @@ public class ProfitMarketMakingSpotWorker implements OrderBookDepthEventListener
         for (BookTickerEvent event : eventList) {
             OrderLevel orderEventLevel = event.getOrderLevel();
             boolean pickOrderLevel = orderLevelList.contains(orderEventLevel);
-            if (pickOrderLevel) {
-                MARKER_MAKER_EXECUTOR.execute(() -> {
+            if (!pickOrderLevel) {
+                continue;
+            }
+
+            // 趋势过滤：单边行情时暂停做市，避免逆向选择损失
+            String symbol = event.getSymbol();
+            BigDecimal midPrice = event.getBidPrice() != null
+                    ? new BigDecimal(event.getBidPrice())
+                    : BigDecimal.ZERO;
+            if (trendFilter.isTrending(symbol, midPrice)) {
+                log.debug("TrendFilter.paused: symbol={}, bid={}, ask={}", symbol, event.getBidPrice(), event.getAskPrice());
+                continue;
+            }
+
+            MARKER_MAKER_EXECUTOR.execute(() -> {
                     // 获取订单缓存池
                     Map<String, OwnOrderBook> ownOrderBook = profitOrderTradeDataManager.getOrderTradePool();
                     event.setArrivalTime(SystemClock.now());
@@ -118,8 +138,7 @@ public class ProfitMarketMakingSpotWorker implements OrderBookDepthEventListener
                             log.error("ProfitMarketMakingSpotWorker.onBookTicker.beginTradeForSell error ", ex);
                         }
                     });
-                });
-            }
+            });
         }
     }
 }
