@@ -66,7 +66,7 @@ public class ProfitMarketMakingSpotWorker implements OrderBookDepthEventListener
     @Override
     public void onDepthOrderBook(String exchangeName, List<BookTickerEvent> eventList) {
         TrackingUtils.saveTrace(generateTraceId(exchangeName, eventList.get(0).getSymbol(), eventList.get(0).getBidPrice(), eventList.get(0).getAskPrice()));
-        log.info("ProfitMarketMakingSpotWorker.onBookTicker.start, bookTickerEventList is {}", JacksonUtil.toJsonStr(eventList));
+        log.debug("ProfitMarketMakingSpotWorker.onBookTicker.start, bookTickerEventList is {}", JacksonUtil.toJsonStr(eventList));
 
         // 获取用户设定的策略，需要在哪几档放置订单
         List<OrderLevel> orderLevelList = profitOrderPlaceStrategy.getOrderLevelList();

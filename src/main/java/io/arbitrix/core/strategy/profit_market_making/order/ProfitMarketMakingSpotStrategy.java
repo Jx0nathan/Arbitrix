@@ -83,7 +83,7 @@ public class ProfitMarketMakingSpotStrategy extends AbstractExchangeClient imple
     @Override
     public void execute(SpotOrderExecutionContext context) {
         ReadyExecuteContext readyExecuteContext = readyToExecute(context);
-        log.info("FixedSpreadBasedOrderPlace.execute.result is {}", JacksonUtil.toJsonStr(readyExecuteContext));
+        log.debug("FixedSpreadBasedOrderPlace.execute.result is {}", JacksonUtil.toJsonStr(readyExecuteContext));
         if (readyExecuteContext.getCanExecute()) {
             // 创建订单
             List<ExchangeOrder> sportOrderList = this.createSportOrderList(context);
@@ -100,7 +100,7 @@ public class ProfitMarketMakingSpotStrategy extends AbstractExchangeClient imple
 
             long gapTime = SystemClock.now() - context.getBookTickerEvent().getArrivalTime();
             StrategyMonitor.recordMarketMakerExecuteOrderThreadGap(gapTime, context.getExchangeName(), context.getSymbol(), context.getOrderSide().toString());
-            log.info("PureMarketMakingSpotWorker.onBookTicker.gapTime:{} CurrentTime is {} arrivalTime is {}", gapTime, SystemClock.now(), context.getBookTickerEvent().getArrivalTime());
+            log.debug("PureMarketMakingSpotWorker.onBookTicker.gapTime:{} CurrentTime is {} arrivalTime is {}", gapTime, SystemClock.now(), context.getBookTickerEvent().getArrivalTime());
 
             // 取消订单
             List<String> cancelOrderIdList = readyExecuteContext.getCancelOrderIdList();
@@ -135,9 +135,9 @@ public class ProfitMarketMakingSpotStrategy extends AbstractExchangeClient imple
         }
 
         if (OrderSide.BUY == context.getOrderSide()) {
-            log.info("createSportOrderList.execute.sportOrderList bidPrice is {} is {}", context.getBookTickerEvent().getBidPrice(), JacksonUtil.toJsonStr(sportOrderList));
+            log.debug("createSportOrderList.execute.sportOrderList bidPrice is {} is {}", context.getBookTickerEvent().getBidPrice(), JacksonUtil.toJsonStr(sportOrderList));
         } else {
-            log.info("createSportOrderList.execute.sportOrderList askPrice is {} is {}", context.getBookTickerEvent().getAskPrice(), JacksonUtil.toJsonStr(sportOrderList));
+            log.debug("createSportOrderList.execute.sportOrderList askPrice is {} is {}", context.getBookTickerEvent().getAskPrice(), JacksonUtil.toJsonStr(sportOrderList));
         }
         return sportOrderList;
     }
