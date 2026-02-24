@@ -53,7 +53,7 @@ public class FuturePureMarketMakingWorker implements BookTickerEventListener {
     public void onBookTicker(String exchangeName, BookTickerEvent bookTickerEvent) {
         //TODO quantity配置从base coin 变成quote coin还没实现
         TrackingUtils.saveTrace(generateTraceId(exchangeName, bookTickerEvent));
-        log.info("FuturePureMarketMakingWorker.onBookTicker.start, bookTickerEvent is {}", bookTickerEvent);
+        log.debug("FuturePureMarketMakingWorker.onBookTicker.start, bookTickerEvent is {}", bookTickerEvent);
         MARKER_MAKER_EXECUTOR.execute(() -> {
             // 获取订单缓存池
             Map<String, OrderTradeUpdateEvent> orderTradeUpdateEventMap = pureMarketMakingFutureOrderTradeDataManager.getOrderTradePool();
