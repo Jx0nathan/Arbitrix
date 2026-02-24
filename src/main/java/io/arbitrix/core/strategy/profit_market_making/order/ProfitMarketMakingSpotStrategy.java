@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import javax.annotation.PostConstruct;
 import io.arbitrix.core.common.domain.ExchangeOrder;
 import io.arbitrix.core.common.domain.ReadyExecuteContext;
 import io.arbitrix.core.common.domain.SpotOrderExecutionContext;
@@ -55,6 +56,16 @@ public class ProfitMarketMakingSpotStrategy extends AbstractExchangeClient imple
 
     @Value("${market.making.price.spread:}")
     private String symbolInterval;
+
+    // 配置缓存，启动时解析一次，避免每次 tick 重复反序列化
+    private Map<String, String> symbolQuantityCache;
+    private Map<String, BigDecimal> symbolIntervalCache;
+
+    @PostConstruct
+    public void initConfigCache() {
+        this.symbolQuantityCache = JacksonUtil.fromMap(symbolQuantity, String.class);
+        this.symbolIntervalCache = JacksonUtil.fromMap(symbolInterval, BigDecimal.class);
+    }
 
     private final ProfitMarketMakingSpotOrderTradeDataManager profitOrderTradeDataManager;
     private final OrderBookDepthDistribution orderBookDepthDistribution;
@@ -176,7 +187,7 @@ public class ProfitMarketMakingSpotStrategy extends AbstractExchangeClient imple
      */
     public List<ExchangeOrder> createSportOrder(SpotOrderExecutionContext context) {
         List<ExchangeOrder> sportOrderList = new ArrayList<>();
-        Map<String, String> symbolIntervalMap = JacksonUtil.fromMap(symbolQuantity, String.class);
+        Map<String, String> symbolIntervalMap = symbolQuantityCache;
 
         int orderSize = profitOrderPlaceStrategy.getOrderPlaceQuantity();
         if (context.getOrderSide() == OrderSide.BUY) {
@@ -223,7 +234,7 @@ public class ProfitMarketMakingSpotStrategy extends AbstractExchangeClient imple
      */
     public List<ExchangeOrder> createSportOrderFollowDepthPrice(SpotOrderExecutionContext context) {
         List<ExchangeOrder> sportOrderList = new ArrayList<>();
-        Map<String, String> symbolIntervalMap = JacksonUtil.fromMap(symbolQuantity, String.class);
+        Map<String, String> symbolIntervalMap = symbolQuantityCache;
 
         String uuid = orderBookDepthDistribution.getUuidByOrderLevel(context.getOrderLevel());
         if (context.getOrderSide() == OrderSide.BUY) {
@@ -250,7 +261,7 @@ public class ProfitMarketMakingSpotStrategy extends AbstractExchangeClient imple
 
     public List<ExchangeOrder> createAllSportOrderBaseOnBestAskPrice(SpotOrderExecutionContext context) {
         List<ExchangeOrder> sportOrderList = new ArrayList<>();
-        Map<String, String> symbolIntervalMap = JacksonUtil.fromMap(symbolQuantity, String.class);
+        Map<String, String> symbolIntervalMap = symbolQuantityCache;
 
         if (context.getOrderSide() == OrderSide.BUY) {
             String buyKey = OrderTradeUtil.buildOrderTradeKey(context.getExchangeName(), context.getSymbol(), OrderSide.BUY);
@@ -307,7 +318,7 @@ public class ProfitMarketMakingSpotStrategy extends AbstractExchangeClient imple
     }
 
     public Map<String, BigDecimal> getSymbolIntervalConfig() {
-        return JacksonUtil.fromMap(symbolInterval, BigDecimal.class);
+        return symbolIntervalCache;
     }
 
     public List<ExchangeOrder> createOrderBaseOnUsdtPrice(SpotOrderExecutionContext context) {
@@ -319,7 +330,7 @@ public class ProfitMarketMakingSpotStrategy extends AbstractExchangeClient imple
         List<ExchangeOrder> sportOrderList = new ArrayList<>();
         BookTickerEvent usdcUsdtData = symbolDataHolder.getBookTickerFromCache(context.getExchangeName(), "USDCUSDT");
         BookTickerEvent bctUsdtData = symbolDataHolder.getBookTickerFromCache(context.getExchangeName(), "BTCUSDT");
-        Map<String, String> symbolIntervalMap = JacksonUtil.fromMap(symbolQuantity, String.class);
+        Map<String, String> symbolIntervalMap = symbolQuantityCache;
         if (context.getOrderSide() == OrderSide.BUY) {
             String buyKey = OrderTradeUtil.buildOrderTradeKey(context.getExchangeName(), context.getSymbol(), OrderSide.BUY);
 
