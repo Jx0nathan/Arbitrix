@@ -107,6 +107,29 @@ strategy:
     # Amount per grid
     amount-per-grid: 0.001
 
+  # Funding cash-and-carry (spot long + perpetual short, collects funding)
+  # Activated when application_execute_strategy_name=funding_carry
+  funding-carry:
+    # SAFETY: true = simulate only, no real orders. Set false to trade live.
+    paper-trade: true
+    scan-interval-ms: 60000
+    # Bitget has no perpetual line in this codebase — use OKX/Binance/Bybit
+    exchanges: OKX
+    symbols: BTCUSDT
+    # Open when annualized funding >= 15%, close when < 5% (hysteresis)
+    open-annualized-threshold: 0.15
+    close-annualized-threshold: 0.05
+    # Entry only if |basis| <= 0.1%; force-close if it blows past 0.5%
+    max-basis-to-open: 0.001
+    max-basis-to-hold: 0.005
+    round-trip-cost: 0.003
+    notional-per-pair-usdt: 500
+    perp-leverage: 2
+    min-margin-ratio-buffer: 0.5
+    max-total-notional-usdt: 2000
+    max-daily-loss-usdt: 100
+    kill-switch-enabled: true
+
 # ===========================================
 # Risk Management
 # ===========================================
